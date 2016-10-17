@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:VGroup xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" horizontalAlign="justify">
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import ll.ui.ViewCreate;
+			import ll.ui.components.Button;
+			import ll.ui.components.List;
+			import ll.ui.core.DataGroup;
+			import ll.ui.core.UISprite;
+			import ll.util.ViewXmlUtil;
+			
+			import mx.binding.utils.BindingUtils;
+			import mx.controls.TextInput;
+			import mx.core.UITextField;
+			
+			import spark.components.Button;
+			import spark.events.TextOperationEvent;
+			
+			import tInspector.itamt.utils.Inspector;
+			
+			private var activeTarget:DisplayObject;
+			public function setActiveTarget(target:DisplayObject):void
+			{
+				this.activeTarget = target;
+				if(!activeTarget.hasOwnProperty("id"))
+					return;
+				this.txtId.text = activeTarget["id"];
+				this.txtX.text = activeTarget.x.toString();
+				this.txtY.text = activeTarget.y.toString();
+				this.txtWidth.text = activeTarget.width.toString();
+				this.txtHight.text = activeTarget.height.toString();
+				if(activeTarget&&activeTarget.hasOwnProperty("viewXml")&& activeTarget["viewXml"]){
+					(activeTarget as Object).viewXml=ViewXmlUtil.upDateConXml(activeTarget);
+				}
+				showSpecialAttr();
+			}
+			
+			protected function onTextInput(event:TextOperationEvent):void
+			{
+				trace(event.currentTarget["text"]);
+				if(activeTarget)
+				{
+					switch(event.currentTarget)
+					{
+						case this.txtId:
+							activeTarget["id"] = this.txtId.text.toString();
+							break;
+						case this.txtX:
+							activeTarget.x = uint(this.txtX.text);
+							break;
+						case this.txtY:
+							activeTarget.y = uint(this.txtY.text);
+							break;
+						case this.txtHight:
+							activeTarget.height = uint(this.txtHight.text);
+							break;
+						case this.txtWidth:
+							activeTarget.width = uint(this.txtWidth.text);
+							break;
+					}
+					(activeTarget as Object).viewXml=ViewXmlUtil.upDateConXml(activeTarget);
+					Inspector.getInstance().turnOff();
+				}
+			}
+			private function showSpecialAttr():void
+			{
+				if(activeTarget&&activeTarget.hasOwnProperty("viewXml")&& activeTarget["viewXml"]){
+					attrContainer.removeAllElements();
+					var viewXml:XML=activeTarget["viewXml"];
+					var lb:Label;
+					var textinput:spark.components.TextInput;
+					var i:int=0;
+					for each(var att:XML in viewXml.attributes())
+					{
+						 if(att.name()=="x"||att.name()=="y"||att.name()=="id"||att.name()=="width"||att.name()=="height"){//公共属性过滤
+							continue; 
+						 }
+						 if(att.name()=="groupName"||att.name()=="lineWidth"||att.name()=="lineHeight"||att.name()=="mouseWheelLine"||att.name()=="toolTip"){//不需要编辑的属性过滤
+							continue; 
+						 }
+						lb=new Label();
+						lb.text=ViewXmlUtil.attrTransTochina(att.name())+":"
+						attrContainer.addElement(lb);
+						lb.x=0;
+						lb.y=i*30+6;
+						textinput=new spark.components.TextInput();
+						textinput.text=viewXml[att.name()];
+						textinput.name=att.name()+"";
+						attrContainer.addElement(textinput);
+						textinput.x=55//lb.x+lb.text.length*8;
+						textinput.y=i*30;
+						textinput.width=100;
+						i++
+					}
+					var applyBtn:spark.components.Button=new spark.components.Button();
+					applyBtn.label="应用";
+//					applyBtn.assetName="btn_common_21";
+//					applyBtn.setsize(70,25);
+					attrContainer.addElement(applyBtn);
+					applyBtn.y=i*30;
+					applyBtn.addEventListener(MouseEvent.CLICK,onApplyBtnClickHandele);
+				}
+			}
+			
+			
+			private function onApplyBtnClickHandele(evt:MouseEvent):void
+			{
+				if(this.activeTarget){
+					var length:int=attrContainer.numElements;
+					var chileEle:DisplayObject
+					for(var i:int=0;i<length; i++){
+						chileEle=attrContainer.getElementAt(i) as DisplayObject;
+						if(chileEle is spark.components.TextInput&&this.activeTarget.hasOwnProperty(chileEle.name)){
+							trace(chileEle.name);
+							if(this.activeTarget is List){//如果是数据绑定的组件，则先生成其itemrenderxml
+								var renderXml:XML;
+								var numChild:int=(this.activeTarget as List).numChildren;
+								renderXml=ViewCreate.getViewXml(this.activeTarget as DisplayObjectContainer,new XML(<ItemRenderer></ItemRenderer>));
+								(this.activeTarget as List).itemRendererXml=renderXml;
+							}
+							this.activeTarget[chileEle.name]=(chileEle as spark.components.TextInput).text
+							if(chileEle.name=="checked"){//对于check属性设置，需要特殊处理
+								this.activeTarget[chileEle.name]=(chileEle as spark.components.TextInput).text=="true"
+							}
+							if(chileEle.name.indexOf("Color")!=-1&&((chileEle as spark.components.TextInput).text.indexOf("0X")!=-1 || (chileEle as spark.components.TextInput).text.indexOf("#")!=-1 )){//颜色值需要进行转换  //如输入的是0XFFFFFF  应该转换为10进制值进行赋值
+								var oldValueStr:String=(chileEle as spark.components.TextInput).text;
+								var iconIndex:int=(chileEle as spark.components.TextInput).text.indexOf("0X")!=-1?(chileEle as spark.components.TextInput).text.indexOf("0X"):(chileEle as spark.components.TextInput).text.indexOf("#");
+								var num16hexValue:String=oldValueStr.substr(iconIndex+1);
+								var num10hexValue:int=int("0x"+num16hexValue);
+								this.activeTarget[chileEle.name]=num10hexValue+"";
+							}
+						}
+					}
+					(activeTarget as Object).viewXml=ViewXmlUtil.upDateConXml(activeTarget);
+				}
+			}
+			
+			
+		]]>
+	</fx:Script>
+	<s:Panel height="145" backgroundColor="#F0F0F0" borderVisible="false"
+			 dropShadowVisible="false" title="公共">
+		<s:VGroup left="0" right="0" top="2" height="108" horizontalAlign="center"
+				  verticalAlign="top">
+			<s:HGroup y="84" width="181" height="32" horizontalAlign="center"
+					  verticalAlign="middle">
+				<s:Label text="ID:"/>
+				<s:TextInput id="txtId" change="onTextInput(event)" />
+			</s:HGroup>
+			
+			<s:TileGroup y="84" width="181" height="64" columnWidth="35"
+						 horizontalAlign="right" horizontalGap="2" orientation="rows"
+						 requestedColumnCount="4" requestedRowCount="2" rowHeight="30"
+						 verticalAlign="middle" verticalGap="2">
+				<s:Label text="width:"/>
+				<s:TextInput id="txtWidth" x="36" width="40" change="onTextInput(event)"/>
+				<s:Label text="hight:"/>
+				<s:TextInput id="txtHight" change="onTextInput(event)"/>
+				<s:Label text="x:"/>
+				<s:TextInput id="txtX" change="onTextInput(event)"/>
+				<s:Label text="y:"/>
+				<s:TextInput id="txtY" change="onTextInput(event)"/>
+			</s:TileGroup>
+		</s:VGroup>
+	</s:Panel>
+	<s:Panel backgroundColor="#F0F0F0" borderVisible="false"
+			 dropShadowVisible="false" title="特定">
+	<!--	<s:VGroup left="0" right="0" top="2" height="108" horizontalAlign="center"
+				  verticalAlign="top">-->
+			<s:Group  left="10"   top="10"  id="attrContainer"  y="0"  />
+		
+		<!--</s:VGroup>-->
+	</s:Panel>
+</s:VGroup>

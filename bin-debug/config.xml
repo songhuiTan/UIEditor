@@ -1,0 +1,13 @@
+<root>
+	<DefaultUI path="E:/working/fbplace/assets/config/AssetUI.swf" />
+	<AssetUI path="E:/working/fbplace/assets/config/AssetUI.swf" />
+	<scale9Grid>
+		<i name='btn_common_21' rect='22, 11, 1, 1' />
+		<i name='win_bg_12' rect='10, 10, 30, 30' />
+		<i name='tab_up_1' rect='23, 12, 1, 1' />		
+		<i name='tab_up_2'  rect='10, 12, 40, 1' />	
+		<i name='scroll_drag_1'  rect='5,10,9,4' />
+		<i name='scroll_down_1'  rect='0,0,0,0' />
+		<i name='scroll_up_1'  rect='0,0,0,0' />
+	</scale9Grid>
+</root>

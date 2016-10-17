@@ -1,0 +1,8 @@
+<AppConfig>
+	<UpdateServer value="http://192.168.8.99:8001/tool/UIEditor"/>
+	<Version value="1.0.7"/>
+	<FileName value="UIEditor"/>
+	<Descritions>
+		<desc value=""/>
+	</Descritions>	
+</AppConfig>

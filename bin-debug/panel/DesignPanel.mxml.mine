@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Panel xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" 
+		 dropShadowVisible="false" title="组件区"
+		 dragEnter="dragEnterHandler(event);"  dragDrop="dragDropHandler(event)"
+		 addedToStage="onAdded(event)">
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import ll.ui.components.*;
+			import ll.util.CreateFactory;
+			
+			import mx.events.DragEvent;
+			import mx.managers.DragManager;
+			
+			import tInspector.itamt.utils.Inspector;
+			import tInspector.itamt.utils.inspector.core.InspectTarget;
+			import tInspector.itamt.utils.inspector.plugins.InspectorPluginId;
+			import tInspector.ll.evt.ComponentEvent;
+			import tInspector.ll.mgr.TInspectorKeyManager;
+			import tInspector.msc.input.KeyCode;
+			
+
+			protected function onAdded(evt:Event):void
+			{
+//				Inspector.getInstance().init(this.contain);
+				var uiClasses:Array = [Button, CheckBox, ComboBox, Image, Label, List, ll.ui.components.Panel, RadioButton, Scroller, TabBar, TextInput, TitleWindow];
+				for each(var uiComponentClass:Class in uiClasses)
+				{
+					Inspector.getInstance().filterManager.applyFilter(uiComponentClass);
+				} 
+				Inspector.getInstance().liveInspectView.addEventListener(ComponentEvent.COMPONENT_SELECT, onComponentSelect);
+				Inspector.getInstance().liveInspectView.addEventListener(ComponentEvent.UPDATE_PROPERTY, onUpdateProperty);
+				
+				var tInspectKeyManager:TInspectorKeyManager=TInspectorKeyManager.getInstance();
+				tInspectKeyManager.init(this.contain);
+			}
+		
+			
+			/**  选择设计界面中的组件 */
+			private function onComponentSelect(evt:tInspector.ll.evt.ComponentEvent):void
+			{
+				dispatchEvent(evt);
+			}
+			
+			private function onUpdateProperty(evt:tInspector.ll.evt.ComponentEvent):void
+			{
+				dispatchEvent(evt);
+			}
+			
+			private function dragEnterHandler(event:DragEvent):void {
+				if(event.dragInitiator is ComponentPanel)
+				{
+					var data : Object = event.dragSource.dataForFormat("treeItems");
+					if(data[0].children().length() == 0)
+						DragManager.acceptDragDrop(Panel(event.currentTarget));
+					Inspector.getInstance().turnOff();
+				}
+			}
+			
+			private function dragDropHandler(event:DragEvent):void
+			{
+				var data : Object = event.dragSource.dataForFormat("treeItems");
+				var className:String = String(data[0].@label);
+				var dragComponent:DisplayObject = CreateFactory.getUIComponent(className);
+				this.contain.addChild(dragComponent);
+				dragComponent.x = this.mouseX - 2;
+				dragComponent.y = this.mouseY - 32;
+				
+				dispatchEvent(new ComponentEvent(ComponentEvent.COMPONENT_ADD, dragComponent));
+			}
+			
+			
+			private var _inspectorEnable:Boolean=true;
+			
+			public function get inspectorEnable():Boolean
+			{
+				return _inspectorEnable;
+			}
+			
+			public function set inspectorEnable(value:Boolean):void
+			{
+				_inspectorEnable = value;
+				if(_inspectorEnable&&!contain.hasEventListener(MouseEvent.MOUSE_OVER)){
+					contain.addEventListener(MouseEvent.MOUSE_OVER,onMouseOver);
+				}else if(!_inspectorEnable)
+				{
+					contain.removeEventListener(MouseEvent.MOUSE_OVER,onMouseOver);
+					Inspector.getInstance().turnOff();
+				}
+			}
+			
+			
+			
+			protected function onMouseOver(event:MouseEvent):void
+			{
+				// TODO Auto-generated method stub
+				if(_inspectorEnable==false){
+					Inspector.getInstance().turnOff();
+					return;
+				}
+				
+				if(!Inspector.getInstance().isOn)
+					Inspector.getInstance().turnOn(InspectorPluginId.LIVE_VIEW);
+			}
+			
+			public function updateLayer(target:DisplayObject, parent:DisplayObjectContainer, preTarget:DisplayObject):void
+			{
+				if(parent && target.parent != parent)
+				{
+					target.parent.removeChild(target);
+					parent.addChild(target);
+				}
+				if(parent == null)
+				{
+					target.parent.removeChild(target);
+					this.contain.addChild(target);
+				}
+				
+//				if(preTarget is List){//list类型不走下面添加逻辑
+//					var pindex:uint;
+//					pindex =(preTarget as DisplayObjectContainer ).numChildren+ 1;
+//					(preTarget as DisplayObjectContainer).addChildAt(target, index);
+//					return;
+//				}
+				
+				if(preTarget)
+				{
+					var index:uint
+					if(preTarget == parent)
+						index = 0;
+					index = preTarget.parent.getChildIndex(preTarget) + 1;
+					target.parent.addChildAt(target, index);
+				}else{
+					target.parent.addChildAt(target, 0);
+				}
+			}
+		]]>
+	</fx:Script>
+	<mx:UIComponent id="contain" left="0" right="0" top="0" bottom="0" mouseOver="onMouseOver(event)"/>
+</s:Panel>

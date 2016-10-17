@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:HGroup xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="35" >
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import ll.GlobalControl;
+			import ll.ui.ViewCreate;
+			import ll.ui.collections.ArrayCollection;
+			import ll.ui.components.Panel;
+			import ll.ui.components.Scroller;
+			import ll.ui.components.ViewStack;
+			import ll.ui.core.DataGroup;
+			import ll.ui.core.UISprite;
+			import ll.ui.interfaces.IScroll;
+			import ll.ui.renderer.ItemRenderer;
+			import ll.util.CreateFactory;
+			import ll.util.ViewXmlUtil;
+			private var designPanel:DesignPanel;
+			private var hierarchyPanel:HierarchyPanel;
+			
+			public function initSomethiing():void
+			{
+				designPanel= GlobalControl.getInstance().designPanel;
+				hierarchyPanel = GlobalControl.getInstance().hieraPanel;
+			}
+			
+			protected function save_clickHandler(event:MouseEvent):void
+			{
+				resualtXml=ViewCreate.getViewXml(designPanel.contain);
+				var result:String =resualtXml.toString()// export();
+				var file:File = new File();
+				file.addEventListener(Event.SELECT, onSelectSaveAsFile);
+				file.addEventListener(Event.CANCEL, onCancelSaveAsFile);
+				file.save(result, "输入文件名.ui");
+			}
+			
+			/** 
+			 * 选择文件夹 
+			 */
+			private static function onSelectSaveAsFile(event:Event):void
+			{
+				var inputDirFile:File = event.target as File;
+				inputDirFile.canonicalize();
+				var filePath:String = inputDirFile.nativePath;
+//				EvtComTrigger.getInstance().dispatchEvent(new BaseEvent("saveComplete"));
+//				Main.getInstance().mainPanel.resetKeyboard();
+			}
+			
+			/**
+			 * 取消选择
+			 * @param event
+			 */		
+			private static function onCancelSaveAsFile(event:Event):void
+			{
+			}
+			
+			
+			private 	var resualtXml:XML//=new XML():
+			protected function read_clickHandler(event:MouseEvent):void
+			{
+				open();
+			}
+			protected function handSwitch_clickHandler(event:MouseEvent):void
+			{
+				if(designPanel){
+					designPanel.inspectorEnable=!designPanel.inspectorEnable;
+				}
+			}
+			
+			/**
+			 * 打开文件
+			 */		
+			public  function open():void
+			{
+				var inputDirFile:File = new File();
+				var txtFilter:FileFilter = new FileFilter("选择UI配置文件", "*.ui");
+				inputDirFile.addEventListener(Event.SELECT, selectFileDirectoryHandler);
+				inputDirFile.browseForOpen("选择UI配置文件", [txtFilter]);
+			}
+			
+			/** 
+			 * 选择文件夹 
+			 */
+			private  function selectFileDirectoryHandler(event:Event):void
+			{
+				designPanel.contain.removeChildren();
+				var inputDirFile:File = event.target as File;
+				inputDirFile.canonicalize();
+			    var	filePath:String = inputDirFile.nativePath;
+				trace(filePath);
+				
+				//读取文件
+				var stream:FileStream = new FileStream();
+				stream.open(inputDirFile, FileMode.READ);
+				resualtXml= XML(stream.readUTFBytes(stream.bytesAvailable));
+				stream.close();
+				if(resualtXml){
+					toCreateView(resualtXml,designPanel.contain, this);
+				}
+				hierarchyPanel.analysisXml(resualtXml);
+			}
+			
+			public function toCreateView(xml:XML, container:DisplayObjectContainer, root:DisplayObject):void
+			{
+				for each(var child:XML in xml.children())
+				{
+					if(container is DataGroup)
+					{//具有呈现器的组件
+						DataGroup(container).itemRendererXml = child;
+						if(String(xml.@defaultDataStr) != ""){
+							DataGroup(container).dataProvider=new ArrayCollection(String(xml.@defaultDataStr).split(","))
+						}
+						if(child.name() == "ItemRenderer")
+						{
+							toCreateView(child, container, container);	
+						}else{
+							var uiComponent:DisplayObject = creatUIComponent(child);
+							container.addChild(uiComponent);
+							if(child.children().length() > 0)
+								toCreateView(child, uiComponent as UISprite, root);
+						}
+						
+					}else{
+						uiComponent = creatUIComponent(child)
+						
+						if(container is ViewStack)
+						{
+							ViewStack(container).addPanel(uiComponent as Panel);
+						}else{
+							if(container is Scroller)
+							{
+								Scroller(container).viewport = IScroll(uiComponent);
+							}else{
+								container.addChild(uiComponent);
+								if(container.hasOwnProperty(uiComponent["id"])  || container  is ItemRenderer)
+								{
+									container[uiComponent["id"]] = uiComponent;
+								}
+								
+								if(root.hasOwnProperty(uiComponent["id"]))
+								{
+									root[uiComponent["id"]] = uiComponent;
+								}
+								
+							}
+						}
+						if(child.children().length() > 0)
+							toCreateView(child, uiComponent as UISprite, root);
+					}
+				}
+			}
+			
+			private function creatUIComponent(child:XML):DisplayObject
+			{
+				var cla:Class = getDefinitionByName("ll.ui.components." + child.name()) as Class;
+				var dp:DisplayObject = new cla() as DisplayObject;
+				if(dp&&dp.hasOwnProperty("viewXml")){
+					dp["viewXml"]= ViewXmlUtil.initCompontXml(dp);
+				}
+				for each(var att:XML in child.attributes())
+				{
+					dp[String(att.name())] = child[att.name()];
+					if(dp["viewXml"].hasOwnProperty(att.name()))
+					dp["viewXml"][att.name()] = child[att.name()]
+				}
+				if(dp.hasOwnProperty("id"))
+				{
+					CreateFactory.resetComponentId(dp["id"]);	
+				}
+				return dp;
+			}
+			
+			protected function clear_clickHandler(event:MouseEvent):void
+			{
+				if(designPanel){
+					designPanel.contain.removeChildren();
+				}
+				if(hierarchyPanel)
+				{
+					hierarchyPanel.componentDp = <root />
+				}
+			}
+			
+		]]>
+	</fx:Script>
+<!--	<s:HGroup  id="topMenu" left="2" top="2" bottom="2" width="100%" >-->
+		<s:Button id="save" label="另保存" click="save_clickHandler(event)" />
+		<s:Button id="read" label="导入" click="read_clickHandler(event)" />
+		<s:ToggleButton id="handSwitch" label="手势开关" click="handSwitch_clickHandler(event)"/>
+		<s:Button id="clear" label="清除组件"  click="clear_clickHandler(event)"/>
+<!--	</s:HGroup>-->
+</s:HGroup>

@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Tree xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" 
+		 borderVisible="false" dropEnabled="true" dragEnabled="true"
+		 dataProvider="{componentDp.node}"
+		 labelField="@label" showRoot="true" 
+		 doubleClickEnabled="true" doubleClick="onDoubleClickHandler(event)"
+		 iconFunction="setFieldIcon" dragComplete="onDragCompleteHandler(event)" dragOver="onDragOverHandler(event)"
+		 initialize="onInitial(event)" >
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import ll.ui.components.PageNavigator;
+			
+			import mx.collections.CursorBookmark;
+			import mx.collections.IViewCursor;
+			import mx.controls.listClasses.ListBaseContentHolder;
+			import mx.controls.treeClasses.TreeItemRenderer;
+			import mx.core.UITextField;
+			import mx.events.DragEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			
+			import tInspector.itamt.utils.Inspector;
+			import tInspector.ll.evt.ComponentEvent;
+			
+			[Bindable]
+			public var componentDp:XML;
+			
+			[Embed("assets/Button.png")]
+			private var Icon_Button:Class;
+			
+			[Embed("assets/CheckBox.png")]
+			private var Icon_CheckBox:Class;
+			
+			[Embed("assets/Image.png")]
+			private var Icon_Image:Class;
+			
+			[Embed("assets/Label.png")]
+			private var Icon_Label:Class;
+			
+			[Embed("assets/List.png")]
+			private var Icon_List:Class;
+			
+			[Embed("assets/RadioButton.png")]
+			private var Icon_RadioButton:Class;
+			
+			[Embed("assets/Panel.png")]
+			private var Icon_Panel:Class;
+			
+			[Embed("assets/TabBar.png")]
+			private var Icon_TabBar:Class;
+			
+			[Embed("assets/TextInput.png")]
+			private var Icon_TextInput:Class;
+			
+			[Embed("assets/TitleWindow.png")]
+			private var Icon_TitleWindow:Class;
+			
+			[Embed("assets/Scroller.png")]
+			private var Icon_Scroller:Class;
+			
+			private const HAS_NO_CHILD:Array = ["Button", "CheckBox", "Image", "Label", "RadioButton", "TextInput", "TabBar", "PageNavigator"]
+			protected function onInitial(event:FlexEvent):void
+			{
+				// TODO Auto-generated method stub
+				componentDp = new XML("<root>" +
+					"</root>");
+			}
+			public function setFieldIcon(item:Object):Class {
+				var icon:Class
+				switch(String(item.@label))
+				{
+					case "Button":
+						icon = Icon_Button;
+						break
+					case "CheckBox":
+						icon = Icon_CheckBox;
+						break;
+					case "Image":
+						icon = Icon_Image;
+						break;
+					case "Label":
+						icon = Icon_Label;
+						break;
+					case "List":
+						icon = Icon_List;
+						break;
+					case "Panel":
+						icon = Icon_Panel;
+						break;
+					case "RadioButton":
+						icon = Icon_RadioButton;
+						break;
+					case "Scroller":
+						icon = Icon_Scroller;
+						break;
+					case "TabBar":
+						icon = Icon_TabBar;
+						break;
+					case "TextInput":
+						icon = Icon_TextInput;
+						break;
+					case "TitleWindow":
+						icon = Icon_TitleWindow;
+						break;
+				}
+				return icon;
+			}
+			
+			public function analysisXml(srcXml:XML):void
+			{
+				componentDp = new XML("<root>" +
+					"</root>");
+				
+				importXml(srcXml, componentDp);
+			}
+			public function importXml(srcXml:XML, parentNode:XML):void
+			{
+				for each(var child:XML in srcXml.children())
+				{
+					var iconName:String = child.name();
+					if(iconName.indexOf("ItemRenderer") == -1)
+					{
+						var xml:XML = new XML("<node label='" + child.name() + "' index='" + child.@id + "' />" );
+						if(HAS_NO_CHILD.indexOf(iconName) == -1)
+						{
+							xml.appendChild(new XML("<node label='...' index='0' />"));
+						}
+						parentNode.appendChild(xml);
+					}else{
+						xml = parentNode;
+					}
+					importXml(child, xml);
+				}
+			}
+			
+			public function addComponent(target:DisplayObject):void
+			{
+				var iconName:String = analysisIconName(target);
+				trace(iconName);
+				
+				var xml:XML = new XML("<node label='" + iconName + "' index='" + target["id"] + "' />" );
+				
+				if(HAS_NO_CHILD.indexOf(iconName) == -1)
+				{
+					xml.appendChild(new XML("<node label='...' index='' />"));
+				}
+				
+				componentDp.appendChild(xml);
+				
+				activateHandler();
+			}
+			
+			public function delComponent(target:DisplayObject):void
+			{
+				var iconName:String = analysisIconName(target);
+				if(target.hasOwnProperty("id"))
+				{
+					var id:String = target["id"];
+					trace(id, iconName);
+					var item:Object = this.getItemByValue(id);
+					this.dataDescriptor.removeChildAt(item.parent(), item, item.childIndex(), this.dataProvider);
+				}
+			}
+			
+			public function getItemByValue(id:String):Object
+			{
+				var cursor:IViewCursor = collection.createCursor();
+				do
+				{
+					if (String(cursor.current.@index) == id)
+						return cursor.current;
+				}while (cursor.moveNext())
+				return null;
+			}
+			
+			public function analysisIconName(target:DisplayObject):String
+			{
+				var id:String = getQualifiedClassName(target);
+				var index:uint = id.lastIndexOf(":") + 1;
+				var iconName:String = id.substr(index);
+				return iconName;
+			}
+			
+			protected function onDragCompleteHandler(event:DragEvent):void
+			{
+				var dragObject : Object = event.dragSource.dataForFormat("treeItems");
+				var curIndex:String = String(dragObject[0].@index);
+				
+				var preIndex:String;
+				var parentIndex:String;
+				
+				var cursor:IViewCursor = collection.createCursor();
+				do
+				{
+					if (String(cursor.current.@index) == curIndex)
+					{
+						var parent:Object = cursor.current.parent();
+						parentIndex = String(parent.@index);
+						while(cursor.movePrevious())
+						{
+							if(cursor.current)
+							{
+								preIndex = String(cursor.current.@index);
+								if(preIndex != "")
+									break;
+							}
+						}
+						break;
+					}
+				}while (cursor.moveNext());
+				
+				trace(preIndex, parentIndex);
+				
+				dispatchEvent(new ComponentEvent(ComponentEvent.LAYER_CHANG, [curIndex, parentIndex, preIndex]));
+				activateHandler();
+			}
+			
+			private function onDragOverHandler(event:DragEvent):void
+			{
+				var currNodeOver : TreeItemRenderer= TreeItemRenderer(
+					
+					event.currentTarget.indexToItemRenderer(event.currentTarget.calculateDropIndex(event)));
+				
+				if (currNodeOver !=null)
+				{
+					if(this.dataDescriptor.isBranch(currNodeOver.data) == true)
+					{
+						if (this.isItemOpen(currNodeOver.data)==false)
+							this.expandItem(currNodeOver.data,true,true);
+					}
+				}
+			}
+			
+			override protected function dragDropHandler(event:DragEvent):void 
+			{
+				var dragObject : Object = event.dragSource.dataForFormat("treeItems");
+				var index:String = String(dragObject[0].@index);
+				if(index == "")
+					return;
+				super.dragDropHandler(event);
+			}
+			
+			protected function activateHandler():void
+			{
+				// TODO Auto-generated method stub
+				for each(var item:XML in this.dataProvider) 
+				{
+					if(this.dataDescriptor.isBranch(item) == true)
+					{
+						if (this.isItemOpen(item)==false)
+							this.expandItem(item,true,true);
+					}
+				}
+			}
+			
+			
+			protected function onDoubleClickHandler(event:MouseEvent):void
+			{
+				// TODO Auto-generated method stub
+				if(String(this.selectedItem.@index) != "")
+					dispatchEvent(new ComponentEvent(ComponentEvent.COMPONENT_ACTIVE, String(this.selectedItem.@index)));
+			}
+			
+		]]>
+	</fx:Script>
+</mx:Tree>
